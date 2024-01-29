@@ -84,7 +84,7 @@ func echoCopyFull(w http.ResponseWriter, r *http.Request) {
 }
 
 // echoReadAll echoes messages from the client by reading the entire message
-// with ioutil.ReadAll.
+// with io.ReadAll.
 func echoReadAll(w http.ResponseWriter, r *http.Request, writeMessage, writePrepared bool) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -178,7 +178,11 @@ func main() {
 	http.HandleFunc("/r", echoReadAllWriter)
 	http.HandleFunc("/m", echoReadAllWriteMessage)
 	http.HandleFunc("/p", echoReadAllWritePreparedMessage)
-	err := http.ListenAndServe(*addr, nil)
+	server := &http.Server{
+		Addr:              *addr,
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+	err := server.ListenAndServe()
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}

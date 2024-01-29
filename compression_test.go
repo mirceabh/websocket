@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"testing"
 )
 
@@ -13,6 +12,7 @@ type nopCloser struct{ io.Writer }
 func (nopCloser) Close() error { return nil }
 
 func TestTruncWriter(t *testing.T) {
+	t.Parallel()
 	const data = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijlkmnopqrstuvwxyz987654321"
 	for n := 1; n <= 10; n++ {
 		var b bytes.Buffer
@@ -23,7 +23,9 @@ func TestTruncWriter(t *testing.T) {
 			if m > n {
 				m = n
 			}
-			w.Write(p[:m])
+			if _, err := w.Write(p[:m]); err != nil {
+				t.Fatal(err)
+			}
 			p = p[m:]
 		}
 		if b.String() != data[:len(data)-len(w.p)] {
@@ -42,30 +44,35 @@ func textMessages(num int) [][]byte {
 }
 
 func BenchmarkWriteNoCompression(b *testing.B) {
-	w := ioutil.Discard
+	w := io.Discard
 	c := newTestConn(nil, w, false)
 	messages := textMessages(100)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		c.WriteMessage(TextMessage, messages[i%len(messages)])
+		if err := c.WriteMessage(TextMessage, messages[i%len(messages)]); err != nil {
+			b.Fatal(err)
+		}
 	}
 	b.ReportAllocs()
 }
 
 func BenchmarkWriteWithCompression(b *testing.B) {
-	w := ioutil.Discard
+	w := io.Discard
 	c := newTestConn(nil, w, false)
 	messages := textMessages(100)
 	c.enableWriteCompression = true
 	c.newCompressionWriter = compressNoContextTakeover
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		c.WriteMessage(TextMessage, messages[i%len(messages)])
+		if err := c.WriteMessage(TextMessage, messages[i%len(messages)]); err != nil {
+			b.Fatal(err)
+		}
 	}
 	b.ReportAllocs()
 }
 
 func TestValidCompressionLevel(t *testing.T) {
+	t.Parallel()
 	c := newTestConn(nil, nil, false)
 	for _, level := range []int{minCompressionLevel - 1, maxCompressionLevel + 1} {
 		if err := c.SetCompressionLevel(level); err == nil {
